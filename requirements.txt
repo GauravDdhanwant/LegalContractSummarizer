@@ -1,5 +1,5 @@
 streamlit
-transformers
-torch
-PyPDF2
-python-docx
+boto3
+langchain
+langchain_community
+faiss-cpu

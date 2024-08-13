@@ -26,7 +26,10 @@ from langchain.chains import RetrievalQA
 ## Bedrock Clients
 bedrock=boto3.client(service_name="bedrock-runtime")
 bedrock_embeddings=BedrockEmbeddings(model_id="amazon.titan-embed-text-v1",client=bedrock)
- 
+
+# Specify your region here
+bedrock = boto3.client(service_name="bedrock-runtime", region_name="us-west-2")
+bedrock_embeddings = BedrockEmbeddings(model_id="amazon.titan-embed-text-v1", client=bedrock) 
  
 ## Data ingestion
 def data_ingestion():

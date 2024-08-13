@@ -1,19 +1,17 @@
 import streamlit as st
-from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import RagTokenizer, RagRetriever, RagTokenForGeneration
 import PyPDF2
 import docx
-import os
 
-# Load a pre-trained model for QA (e.g., a RAG model or a similar model)
-# Assuming the use of a pipeline for simplicity
+# Load RAG model and tokenizer
 @st.cache_resource
-def load_qa_pipeline():
-    tokenizer = AutoTokenizer.from_pretrained("facebook/rag-token-base")
-    model = AutoModelForSeq2SeqLM.from_pretrained("facebook/rag-token-base")
-    qa_pipeline = pipeline("question-answering", model=model, tokenizer=tokenizer)
-    return qa_pipeline
+def load_rag_pipeline():
+    tokenizer = RagTokenizer.from_pretrained("facebook/rag-token-base")
+    retriever = RagRetriever.from_pretrained("facebook/rag-token-base", use_dummy_dataset=True)
+    model = RagTokenForGeneration.from_pretrained("facebook/rag-token-base", retriever=retriever)
+    return tokenizer, model
 
-qa_pipeline = load_qa_pipeline()
+tokenizer, model = load_rag_pipeline()
 
 def read_pdf(file):
     reader = PyPDF2.PdfFileReader(file)
@@ -56,11 +54,12 @@ if st.session_state.document_text:
     
     if st.button("Submit Query") and query:
         # Use the RAG model for QA
-        inputs = {"question": query, "context": st.session_state.document_text}
-        answer = qa_pipeline(**inputs)
+        inputs = tokenizer(query, return_tensors="pt")
+        outputs = model.generate(**inputs)
+        answer = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
         
         # Append query and answer to chat history
-        st.session_state.chat_history.append({"query": query, "answer": answer['answer']})
+        st.session_state.chat_history.append({"query": query, "answer": answer})
         
         # Display the chat history
         for idx, chat in enumerate(st.session_state.chat_history):

@@ -2,3 +2,8 @@ streamlit
 torch
 transformers
 Pillow
+PyPDF2
+beautifulsoup4
+python-docx
+pyth
+google-generativeai

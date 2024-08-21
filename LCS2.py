@@ -1,130 +1,174 @@
-import json
-import os
-import sys
-import boto3
 import streamlit as st
- 
-## We will be suing Titan Embeddings Model To generate Embedding
- 
-from langchain_community.embeddings import BedrockEmbeddings
-from langchain.llms.bedrock import Bedrock
- 
-## Data Ingestion
- 
-import numpy as np
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFDirectoryLoader
- 
-# Vector Embedding And Vector Store
- 
-from langchain.vectorstores import FAISS
- 
-## LLm Models
-from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
- 
-## Bedrock Clients
-bedrock=boto3.client(service_name="bedrock-runtime")
-bedrock_embeddings=BedrockEmbeddings(model_id="amazon.titan-embed-text-v1",client=bedrock)
+import os
+import datetime
+import google.generativeai as genai
+from docx import Document
+import PyPDF2
+from bs4 import BeautifulSoup
+import pyth
 
-# Specify your region here
-bedrock = boto3.client(service_name="bedrock-runtime", region_name="us-west-2")
-bedrock_embeddings = BedrockEmbeddings(model_id="amazon.titan-embed-text-v1", client=bedrock) 
- 
-## Data ingestion
-def data_ingestion():
-    loader=PyPDFDirectoryLoader("data")
-    documents=loader.load()
- 
-    # - in our testing Character split works better with this PDF data set
-    text_splitter=RecursiveCharacterTextSplitter(chunk_size=10000,
-                                                 chunk_overlap=1000)
-    docs=text_splitter.split_documents(documents)
-    return docs
- 
-## Vector Embedding and vector store
- 
-def get_vector_store(docs):
-    vectorstore_faiss=FAISS.from_documents(
-        docs,
-        bedrock_embeddings
-    )
-    vectorstore_faiss.save_local("faiss_index")
- 
-def get_claude_llm():
-    ##create the Anthropic Model
-    llm=Bedrock(model_id="ai21.j2-mid-v1",client=bedrock,
-                model_kwargs={'maxTokens':512})
-    return llm
- 
-def get_llama2_llm():
-    ##create the Anthropic Model
-    llm=Bedrock(model_id="meta.llama2-70b-chat-v1",client=bedrock,
-                model_kwargs={'max_gen_len':512})
-    return llm
- 
-prompt_template = """
- 
-Human: Use the following pieces of context to provide a 
-concise answer to the question at the end but usse atleast summarize with 
-250 words with detailed explaantions. If you don't know the answer, 
-just say that you don't know, don't try to make up an answer.
-<context>
-{context}
-</context
- 
-Question: {question}
- 
-Assistant:"""
- 
-PROMPT = PromptTemplate(
-    template=prompt_template, input_variables=["context", "question"]
-)
- 
-def get_response_llm(llm,vectorstore_faiss,query):
-    qa = RetrievalQA.from_chain_type(
-    llm=llm,
-    chain_type="stuff",
-    retriever=vectorstore_faiss.as_retriever(
-        search_type="similarity", search_kwargs={"k": 3}
-    ),
-    return_source_documents=True,
-    chain_type_kwargs={"prompt": PROMPT}
-)
-    answer=qa({"query":query})
-    return answer['result']
- 
- 
-def main():
-    st.set_page_config("Chat PDF")
-    st.header("Chat with PDF using AWS Bedrock💁")
- 
-    user_question = st.text_input("Ask a Question from the PDF Files")
- 
-    with st.sidebar:
-        st.title("Update Or Create Vector Store:")
-        if st.button("Vectors Update"):
-            with st.spinner("Processing..."):
-                docs = data_ingestion()
-                get_vector_store(docs)
-                st.success("Done")
- 
-    if st.button("Claude Output"):
-        with st.spinner("Processing..."):
-            faiss_index = FAISS.load_local("faiss_index", bedrock_embeddings)
-            llm=get_claude_llm()
-            #faiss_index = get_vector_store(docs)
-            st.write(get_response_llm(llm,faiss_index,user_question))
-            st.success("Done")
- 
-    if st.button("Llama2 Output"):
-        with st.spinner("Processing..."):
-            faiss_index = FAISS.load_local("faiss_index", bedrock_embeddings)
-            llm=get_llama2_llm()
-            #faiss_index = get_vector_store(docs)
-            st.write(get_response_llm(llm,faiss_index,user_question))
-            st.success("Done")
- 
-if __name__ == "__main__":
-    main()
+# Initialize folders
+input_documents_folder = "input_documents_folder"
+output_responses_folder = "output_responses_folder"
+log_folder = "log_folder"
+os.makedirs(input_documents_folder, exist_ok=True)
+os.makedirs(output_responses_folder, exist_ok=True)
+os.makedirs(log_folder, exist_ok=True)
 
+# Initialize session state
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = []
+
+# Streamlit Interface
+st.title("Your Personalized Legal Advisor")
+
+# API Key Input
+api_key = st.text_input("Enter your Google API Key:", type="password")
+if api_key:
+    genai.configure(api_key=api_key)
+
+# Model Selection
+st.sidebar.header("Model Selection")
+models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+selected_model = st.sidebar.selectbox("Choose a model:", models)
+
+# Document Upload
+uploaded_files = st.file_uploader("Upload Documents", accept_multiple_files=True, type=['pdf', 'docx', 'txt', 'rtf', 'html'])
+
+# Number of Iterations Input
+num_iterations = st.number_input("Enter the number of iterations:", min_value=1, max_value=100, value=1, step=1)
+
+# Instructions Input
+instructions = st.text_area("Enter your query or instructions for the legal documents:")
+
+if st.button("Start Single Session Analysis"):
+    if not uploaded_files and not instructions:
+        st.error("Please upload at least one document or provide a query.")
+    else:
+        combined_text = ""
+        for uploaded_file in uploaded_files:
+            filename = uploaded_file.name
+            filepath = os.path.join(input_documents_folder, filename)
+            with open(filepath, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+
+            if filename.lower().endswith(".docx"):
+                document = Document(filepath)
+                combined_text += "\n".join([paragraph.text for paragraph in document.paragraphs])
+
+            elif filename.lower().endswith(".pdf"):
+                with open(filepath, "rb") as pdf_file:
+                    pdf_reader = PyPDF2.PdfReader(pdf_file)
+                    combined_text += "\n".join([pdf_reader.pages[i].extract_text() for i in range(len(pdf_reader.pages))])
+
+            elif filename.lower().endswith(".html"):
+                with open(filepath, "rb") as html_file:
+                    soup = BeautifulSoup(html_file, "html.parser")
+                    combined_text += soup.get_text()
+
+            elif filename.lower().endswith(".rtf"):
+                with open(filepath, "r") as rtf_file:
+                    rtf_content = rtf_file.read()
+                    combined_text += pyth.decode(rtf_content)
+
+            elif filename.lower().endswith(".txt"):
+                with open(filepath, "r", encoding="utf-8") as txt_file:
+                    combined_text += txt_file.read()
+
+        st.write(f"Total combined text length: {len(combined_text)} characters")
+
+        model = genai.GenerativeModel(selected_model)
+
+        for iteration in range(num_iterations):
+            prompt = f"{instructions}: {combined_text}"
+            response = model.generate_content(prompt)
+
+            st.write(f"Iteration {iteration + 1} Response:")
+            st.write(response.text)
+
+            # Logging
+            today = datetime.date.today().strftime("%Y-%m-%d")
+            log_file = os.path.join(log_folder, f"{today}.log")
+            with open(log_file, 'a') as log:
+                log.write(f"Iteration {iteration + 1} Response: {response.text}\n")
+
+            # Save response
+            output_filename = f"Output_{filename}_{iteration + 1}.txt"
+            output_path = os.path.join(output_responses_folder, output_filename)
+            with open(output_path, 'w') as output_file:
+                output_file.write(response.text)
+
+        st.success("Single session analysis complete. Check the log and output files.")
+
+if st.button("Start Conversation"):
+    if not uploaded_files and not instructions:
+        st.error("Please upload at least one document or provide a query.")
+    else:
+        combined_text = ""
+        for uploaded_file in uploaded_files:
+            filename = uploaded_file.name
+            filepath = os.path.join(input_documents_folder, filename)
+            with open(filepath, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+
+            if filename.lower().endswith(".docx"):
+                document = Document(filepath)
+                combined_text += "\n".join([paragraph.text for paragraph in document.paragraphs])
+
+            elif filename.lower().endswith(".pdf"):
+                with open(filepath, "rb") as pdf_file:
+                    pdf_reader = PyPDF2.PdfReader(pdf_file)
+                    combined_text += "\n".join([pdf_reader.pages[i].extract_text() for i in range(len(pdf_reader.pages))])
+
+            elif filename.lower().endswith(".html"):
+                with open(filepath, "rb") as html_file:
+                    soup = BeautifulSoup(html_file, "html.parser")
+                    combined_text += soup.get_text()
+
+            elif filename.lower().endswith(".rtf"):
+                with open(filepath, "r") as rtf_file:
+                    rtf_content = rtf_file.read()
+                    combined_text += pyth.decode(rtf_content)
+
+            elif filename.lower().endswith(".txt"):
+                with open(filepath, "r", encoding="utf-8") as txt_file:
+                    combined_text += txt_file.read()
+
+        st.write(f"Total combined text length: {len(combined_text)} characters")
+
+        model = genai.GenerativeModel(selected_model)
+
+        # Construct the conversation history into a single context
+        context = "\n".join([f"User: {entry['user']}\nAI: {entry['ai']}" for entry in st.session_state.conversation_history])
+        if combined_text:
+            context += f"\nContext from documents: {combined_text}"
+
+        prompt = f"{context}\nUser: {instructions}"
+        response = model.generate_content(prompt)
+
+        # Save the interaction to the session state
+        st.session_state.conversation_history.append({
+            "user": instructions,
+            "ai": response.text
+        })
+
+        st.write("Conversation Response:")
+        st.write(response.text)
+
+        # Logging
+        today = datetime.date.today().strftime("%Y-%m-%d")
+        log_file = os.path.join(log_folder, f"{today}.log")
+        with open(log_file, 'a') as log:
+            log.write(f"Conversation Response: {response.text}\n")
+
+        # Save response
+        output_filename = f"Conversation_Output_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        output_path = os.path.join(output_responses_folder, output_filename)
+        with open(output_path, 'w') as output_file:
+            output_file.write(response.text)
+
+        st.success("Conversation updated. Check the log and output files.")
+
+if st.button("Clear Conversation History"):
+    st.session_state.conversation_history = []
+    st.success("Conversation history cleared successfully.")

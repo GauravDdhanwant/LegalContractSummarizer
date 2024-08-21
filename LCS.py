@@ -16,7 +16,7 @@ os.makedirs(output_responses_folder, exist_ok=True)
 os.makedirs(log_folder, exist_ok=True)
 
 # Streamlit Interface
-st.title("Chat with PDF/Docx using Google Gemini AI")
+st.title("Docu-mentor - Your personalized legal advisor")
 
 # API Key Input
 api_key = st.text_input("Enter your Google API Key:", type="password")

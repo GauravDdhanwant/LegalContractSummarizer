@@ -1,6 +1,4 @@
 streamlit
-boto3
-langchain
-langchain_community
-faiss-cpu
-pypdf
+torch
+transformers
+Pillow

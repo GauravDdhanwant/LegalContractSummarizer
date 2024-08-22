@@ -20,7 +20,7 @@ if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
 
 # Streamlit Interface
-st.title("Your Personalized Legal Advisor")
+st.title("Docu-Mentor - Your Personalized Legal Advisor")
 
 # API Key Input
 api_key = st.text_input("Enter your Google API Key:", type="password")

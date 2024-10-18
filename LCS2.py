@@ -48,7 +48,7 @@ if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
 
 # Streamlit Interface
-st.title("InsightsBoard - Your Personalized Legal Advisor")
+st.title("Docu-Mentor - Your Personalized Legal Advisor")
 
 # API Key Input
 api_key = st.text_input("Enter your Google API Key:", type="password")
@@ -57,8 +57,7 @@ if api_key:
 
 # Model Selection
 st.sidebar.image("nice_icon.jpeg", width=150)  # Adding the nice icon to the top of the sidebar
-st.sidebar.title("InsightsBoard")
-
+st.sidebar.title("Documentor")
 st.sidebar.header("Model Selection")
 models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
 selected_model = st.sidebar.selectbox("Choose a model:", models)

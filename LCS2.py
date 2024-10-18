@@ -7,6 +7,34 @@ import PyPDF2
 from bs4 import BeautifulSoup
 import pyth
 
+# Set page configuration
+st.set_page_config(page_title="Documentor", page_icon=":bar_chart:", layout="wide")
+
+# Apply the theme
+st.markdown("""
+    <style>
+    .reportview-container {
+        background-color: #f5f5f5;
+    }
+    .sidebar .sidebar-content {
+        background-color: #212f3d;
+    }
+    .sidebar .sidebar-content .sidebar-header {
+        background-color: #1e3a8a;
+        color: #212f3d;
+    }
+    .stButton>button {
+        background-color: #1e3a8a;
+        color: #ffffff;
+        border-radius: 4px;
+        border: none;
+    }
+    .stImage {
+        max-width: 100%;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # Initialize folders
 input_documents_folder = "input_documents_folder"
 output_responses_folder = "output_responses_folder"
@@ -20,7 +48,7 @@ if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
 
 # Streamlit Interface
-st.title("Docu-Mentor - Your Personalized Legal Advisor")
+st.title("InsightsBoard - Your Personalized Legal Advisor")
 
 # API Key Input
 api_key = st.text_input("Enter your Google API Key:", type="password")
@@ -28,7 +56,8 @@ if api_key:
     genai.configure(api_key=api_key)
 
 # Model Selection
-st.sidebar.image("nice_icon.jpeg")  # Adding the nice icon to the top of the sidebar
+st.sidebar.image("Nice Icon.png", width=150)  # Adding the nice icon to the top of the sidebar
+st.sidebar.title("InsightsBoard")
 
 st.sidebar.header("Model Selection")
 models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]

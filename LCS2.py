@@ -56,7 +56,7 @@ if api_key:
     genai.configure(api_key=api_key)
 
 # Model Selection
-st.sidebar.image("Nice Icon.png", width=150)  # Adding the nice icon to the top of the sidebar
+st.sidebar.image("nice_icon.jpeg", width=150)  # Adding the nice icon to the top of the sidebar
 st.sidebar.title("InsightsBoard")
 
 st.sidebar.header("Model Selection")

@@ -28,7 +28,7 @@ if api_key:
     genai.configure(api_key=api_key)
 
 # Model Selection
-st.sidebar.image("nice_icon.jpeg", width="50%", use_column_width=False)  # Adding the nice icon to the top of the sidebar
+st.sidebar.image("nice_icon.jpeg")  # Adding the nice icon to the top of the sidebar
 
 st.sidebar.header("Model Selection")
 models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
